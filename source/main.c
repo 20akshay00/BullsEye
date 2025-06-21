@@ -177,10 +177,11 @@ int main(int argc, char **argv)
         .right = {
             .screen = BOTTOM_SCREEN,
             .id = 2,
-            .pos = {32, -32}
+            .pos = {0, -32}
         }
     };
 
+    // left half
     NF_CreateSprite(
         bow.left.screen,
         bow.left.id,
@@ -189,8 +190,20 @@ int main(int argc, char **argv)
         bow.pos.y + bow.left.pos.y
     );
 
-    NF_EnableSpriteRotScale(BOTTOM_SCREEN, 1, 1, false);
-
+    NF_EnableSpriteRotScale(BOTTOM_SCREEN, bow.left.id, 1, false);
+    
+    // right half
+    NF_CreateSprite(
+        bow.right.screen,
+        bow.right.id,
+        0, 0,
+        bow.pos.x + bow.right.pos.x,
+        bow.pos.y + bow.right.pos.y
+    );
+    
+    NF_EnableSpriteRotScale(BOTTOM_SCREEN, bow.right.id, 2, false);
+    NF_HflipSprite(BOTTOM_SCREEN, bow.right.id, true);
+    
     while (1)
     {
         swiWaitForVBlank();
@@ -210,14 +223,19 @@ int main(int argc, char **argv)
 
             crosshair.pos.x = SCREEN_WIDTH/2 + TOUCH_SENSITIVITY * bow.relative_distance.x;
             crosshair.pos.y = SCREEN_HEIGHT + TOUCH_SENSITIVITY * bow.relative_distance.y;
-            
+            draw(&crosshair);
+
+            // rotate bow
             bow.angle = atan2(bow.relative_distance.y, bow.relative_distance.x) + PI / 2;
             NF_SpriteRotScale(BOTTOM_SCREEN, bow.left.id, floor(rad2base512(bow.angle)), 256, 256);
             NF_MoveSprite(BOTTOM_SCREEN, bow.left.id, 
-                bow.pos.x + bow.left.pos.x - bow.left.pos.x * (1 - cos(bow.angle)) - bow.left.pos.y * sin(bow.angle), 
-                bow.pos.y + bow.left.pos.y - bow.left.pos.y * (1 - cos(bow.angle)) + bow.left.pos.x * sin(bow.angle));
+                bow.pos.x + bow.left.pos.x - bow.left.pos.x/2 * (1 - cos(bow.angle)), 
+                bow.pos.y + bow.left.pos.y + bow.left.pos.x/2 * sin(bow.angle));
 
-            draw(&crosshair);
+            NF_SpriteRotScale(BOTTOM_SCREEN, bow.right.id, floor(rad2base512(bow.angle)), 256, 256);
+            NF_MoveSprite(BOTTOM_SCREEN, bow.right.id, 
+                bow.pos.x + bow.right.pos.x + bow.left.pos.x/2 * (1 - cos(bow.angle)), 
+                bow.pos.y + bow.right.pos.y - bow.left.pos.x/2 * sin(bow.angle));
         }
 
         else if (keysUp() & KEY_TOUCH) {
