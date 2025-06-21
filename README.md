@@ -1,4 +1,4 @@
-# BullsEye - CURRENTLY WIP!!s
+# BullsEye - CURRENTLY WIP!!
 
 A simple game made with [libnds](https://github.com/blocksds/libnds) from the [BlocksDS](https://github.com/blocksds) toolchain and [NightFoxLib](https://github.com/knightfox75/nds_nflib) for the Nintendo DS(i).
 

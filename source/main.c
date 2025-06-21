@@ -103,15 +103,15 @@ int main(int argc, char **argv)
     NF_InitSpriteSys(BOTTOM_SCREEN);
 
     // Load the Tiled Background
-    NF_LoadTiledBg("images/bg", "bg", 256, 256);
+    NF_LoadTiledBg("backgrounds/bg", "bg", 256, 256);
     NF_CreateTiledBg(TOP_SCREEN, 0, "bg");
 
     // Load sprite files from NitroFS
-    NF_LoadSpriteGfx("images/crosshair", 0, 32, 32);
-    NF_LoadSpritePal("images/crosshair", 0);
+    NF_LoadSpriteGfx("sprites/crosshair", 0, 32, 32);
+    NF_LoadSpritePal("sprites/crosshair", 0);
     
-    NF_LoadSpriteGfx("images/crosshair1", 1, 32, 32);
-    NF_LoadSpritePal("images/crosshair1", 1);
+    NF_LoadSpriteGfx("sprites/crosshair1", 1, 32, 32);
+    NF_LoadSpritePal("sprites/crosshair1", 1);
 
     // Transfer the required sprites to VRAM
     NF_VramSpriteGfx(TOP_SCREEN, 0, 0, true);
