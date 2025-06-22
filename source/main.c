@@ -10,6 +10,7 @@
 #define SCREEN_WIDTH 256
 #define SCREEN_HEIGHT 192
 #define TOUCH_SENSITIVITY 2.75
+#define MAX_TOUCH_DISTANCE 64
 
 #define PI 3.14159265358979323846
 
@@ -45,6 +46,9 @@ struct Arrow {
     struct Vector2 pos; // position of the arrow
     struct Sprite2D sprite;
     int width; // width of the arrow
+    int angle; // angle of the arrow in base 512
+    bool active; // whether the arrow is active or not
+    int speed; // speed of the arrow
 };
 
 void draw(struct CrossHair *crosshair)
@@ -62,6 +66,10 @@ void draw(struct CrossHair *crosshair)
 float rad2base512(float radians)
 {
     return radians * (256.0f / PI);
+}
+
+int sign(int x) {
+    return (x >> 31) | (!!x);
 }
 
 void SpriteRotScale(int screen, u8 id, s32 angle, u32 sx, u32 sy)
@@ -271,7 +279,10 @@ int main(int argc, char **argv)
             .id = 5,
             .pos = {-32, -32} // relative to bow position
         },
-        .width = 64
+        .width = 64,
+        .angle = 0,
+        .active = false,
+        .speed = 2
     };
 
     NF_CreateSprite(
@@ -282,7 +293,7 @@ int main(int argc, char **argv)
         arrow.pos.y + arrow.sprite.pos.y
     );
 
-    NF_EnableSpriteRotScale(arrow.sprite.screen, arrow.sprite.id, 1, false);
+    NF_EnableSpriteRotScale(arrow.sprite.screen, arrow.sprite.id, 5, false);
 
     while (1)
     {
@@ -293,13 +304,14 @@ int main(int argc, char **argv)
         if (keysDown() & KEY_TOUCH){
             bow.anchor_point.x = touch_pos.px;
             bow.anchor_point.y = touch_pos.py;
-
-            crosshair.active = true;
         }
         
         if (keys_held & KEY_TOUCH) {
             bow.relative_distance.x = bow.anchor_point.x - touch_pos.px;
-            bow.relative_distance.y = bow.anchor_point.y - touch_pos.py;
+            if (abs(bow.relative_distance.x) > MAX_TOUCH_DISTANCE)
+                bow.relative_distance.x = sign(bow.relative_distance.x) * MAX_TOUCH_DISTANCE;
+
+            bow.relative_distance.y = fmax(fmin(0, bow.anchor_point.y - touch_pos.py), -MAX_TOUCH_DISTANCE);
 
             crosshair.pos.x = SCREEN_WIDTH/2 + TOUCH_SENSITIVITY * bow.relative_distance.x;
             crosshair.pos.y = SCREEN_HEIGHT + TOUCH_SENSITIVITY * bow.relative_distance.y;
@@ -336,16 +348,29 @@ int main(int argc, char **argv)
                 bow.pos.y + bow.right.pos.y + bow.width/2 * sin(bow.angle));
 
             // arrow
-            arrow.sprite.pos.y = arrow.pos_def.y - 0.2 * bow.relative_distance.y;
-            NF_MoveSprite(BOTTOM_SCREEN, arrow.sprite.id,
-                arrow.pos.x + arrow.sprite.pos.x - (arrow.width/2 + arrow.sprite.pos.y) * sin(bow.angle), 
-                arrow.pos.y + arrow.sprite.pos.y - (arrow.width/2 + arrow.sprite.pos.y) * (1 - cos(bow.angle)));
-
+            if (!arrow.active){
+                SpriteRotScale(BOTTOM_SCREEN, arrow.sprite.id, floor(rad2base512(bow.angle)), 256, 256);
+                arrow.sprite.pos.y = arrow.pos_def.y - 0.2 * bow.relative_distance.y;
+                NF_MoveSprite(BOTTOM_SCREEN, arrow.sprite.id,
+                    arrow.pos.x + arrow.sprite.pos.x - (arrow.width/2 + arrow.sprite.pos.y) * sin(bow.angle), 
+                    arrow.pos.y + arrow.sprite.pos.y - (arrow.width/2 + arrow.sprite.pos.y) * (1 - cos(bow.angle)));
+            }
         }
 
-        else if (keysUp() & KEY_TOUCH) {
-            crosshair.active = false;
+        else if ((keysUp() & KEY_TOUCH) && (!arrow.active)){
+            arrow.active = true;
+            arrow.angle = floor(rad2base512(bow.angle));
+            arrow.pos.x -= (arrow.width/2 + arrow.sprite.pos.y) * sin(bow.angle);
+            arrow.pos.y -= (arrow.width/2 + arrow.sprite.pos.y) * (1 - cos(bow.angle));
             shoot();
+        }
+
+        if (arrow.active){
+            arrow.pos.x += cos(arrow.angle) * arrow.speed;
+            arrow.pos.y += sin(arrow.angle) * arrow.speed;
+            NF_MoveSprite(BOTTOM_SCREEN, arrow.sprite.id,
+                    arrow.pos.x + arrow.sprite.pos.x, 
+                    arrow.pos.y + arrow.sprite.pos.y);
         }
 
         // Update OAM array
