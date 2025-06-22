@@ -9,7 +9,7 @@
 
 #define SCREEN_WIDTH 256
 #define SCREEN_HEIGHT 192
-#define TOUCH_SENSITIVITY 1.75
+#define TOUCH_SENSITIVITY 2.75
 
 #define PI 3.14159265358979323846
 
@@ -37,6 +37,14 @@ struct Bow {
     float angle; // in radians
     struct Sprite2D left;
     struct Sprite2D right;
+    int width; // width of the bow
+};
+
+struct Arrow {
+    struct Vector2 pos_def; // default position of the arrow SPRITE
+    struct Vector2 pos; // position of the arrow
+    struct Sprite2D sprite;
+    int width; // width of the arrow
 };
 
 void draw(struct CrossHair *crosshair)
@@ -56,6 +64,22 @@ float rad2base512(float radians)
     return radians * (256.0f / PI);
 }
 
+void SpriteRotScale(int screen, u8 id, s32 angle, u32 sx, u32 sy)
+{
+    // Angle limits
+    if (angle < -512)
+        angle += 512;
+    if (angle > 512)
+        angle -= 512;
+
+    angle = -angle << 6; // Switch from base 512 to base 32768
+
+    // Update rotation and scale in OAM
+    if (screen == 0)
+        oamRotateScale(&oamMain, id, angle, sx, sy);
+    else
+        oamRotateScale(&oamSub, id, angle, sx, sy);
+}
 
 bool readInput(uint16_t *keys_held, touchPosition *touch_pos)
 {
@@ -137,12 +161,24 @@ int main(int argc, char **argv)
     NF_LoadSpriteGfx("sprites/bow", 1, 64, 64);
     NF_LoadSpritePal("sprites/bow", 1);
 
+    NF_LoadSpriteGfx("sprites/string", 2, 64, 64);
+    NF_LoadSpritePal("sprites/string", 2);
+
+    NF_LoadSpriteGfx("sprites/arrow", 3, 64, 64);
+    NF_LoadSpritePal("sprites/arrow", 3);
+
     // Transfer the required sprites to VRAM
     NF_VramSpriteGfx(TOP_SCREEN, 0, 0, true);
     NF_VramSpritePal(TOP_SCREEN, 0, 0);
 
     NF_VramSpriteGfx(BOTTOM_SCREEN, 1, 0, true);
     NF_VramSpritePal(BOTTOM_SCREEN, 1, 0);
+
+    NF_VramSpriteGfx(BOTTOM_SCREEN, 2, 1, true);
+    NF_VramSpritePal(BOTTOM_SCREEN, 2, 1);
+
+    NF_VramSpriteGfx(BOTTOM_SCREEN, 3, 2, true);
+    NF_VramSpritePal(BOTTOM_SCREEN, 3, 2);
 
     // create cross hair
     struct CrossHair crosshair = {
@@ -165,7 +201,7 @@ int main(int argc, char **argv)
 
     // create bow
     struct Bow bow = {
-        .pos = {SCREEN_WIDTH/2, SCREEN_HEIGHT/2},
+        .pos = {SCREEN_WIDTH/2, SCREEN_HEIGHT/2.5},
         .anchor_point = {0, 0},
         .relative_distance = {0, 0},
         .angle = 0.0f,
@@ -178,7 +214,8 @@ int main(int argc, char **argv)
             .screen = BOTTOM_SCREEN,
             .id = 2,
             .pos = {0, -32}
-        }
+        },
+        .width = 64
     };
 
     // left half
@@ -200,10 +237,53 @@ int main(int argc, char **argv)
         bow.pos.x + bow.right.pos.x,
         bow.pos.y + bow.right.pos.y
     );
-    
+
     NF_EnableSpriteRotScale(BOTTOM_SCREEN, bow.right.id, 2, false);
-    NF_HflipSprite(BOTTOM_SCREEN, bow.right.id, true);
-    
+    oamRotateScale(&oamSub, bow.right.id, 0, -256, 256);
+
+    // string left
+    NF_CreateSprite(
+        bow.left.screen,
+        3,
+        1, 1,
+        bow.pos.x + bow.left.pos.x,
+        bow.pos.y + bow.left.pos.y
+    );
+    NF_EnableSpriteRotScale(BOTTOM_SCREEN, 3, 3, false);
+
+    // string right
+    NF_CreateSprite(
+        bow.right.screen,
+        4,
+        1, 1,
+        bow.pos.x + bow.right.pos.x,
+        bow.pos.y + bow.right.pos.y
+    );
+    NF_EnableSpriteRotScale(BOTTOM_SCREEN, 4, 4, false);
+    oamRotateScale(&oamSub, 4, 0, -256, 256);
+
+    // arrow
+    struct Arrow arrow = {
+        .pos_def = {-32, -32}, // default position of the arrow sprite
+        .pos = {bow.pos.x, bow.pos.y},
+        .sprite = {
+            .screen = BOTTOM_SCREEN,
+            .id = 5,
+            .pos = {-32, -32} // relative to bow position
+        },
+        .width = 64
+    };
+
+    NF_CreateSprite(
+        arrow.sprite.screen,
+        arrow.sprite.id,
+        2, 1,
+        arrow.pos.x + arrow.sprite.pos.x,
+        arrow.pos.y + arrow.sprite.pos.y
+    );
+
+    NF_EnableSpriteRotScale(arrow.sprite.screen, arrow.sprite.id, 1, false);
+
     while (1)
     {
         swiWaitForVBlank();
@@ -227,15 +307,40 @@ int main(int argc, char **argv)
 
             // rotate bow
             bow.angle = atan2(bow.relative_distance.y, bow.relative_distance.x) + PI / 2;
-            NF_SpriteRotScale(BOTTOM_SCREEN, bow.left.id, floor(rad2base512(bow.angle)), 256, 256);
-            NF_MoveSprite(BOTTOM_SCREEN, bow.left.id, 
-                bow.pos.x + bow.left.pos.x - bow.left.pos.x/2 * (1 - cos(bow.angle)), 
-                bow.pos.y + bow.left.pos.y + bow.left.pos.x/2 * sin(bow.angle));
 
-            NF_SpriteRotScale(BOTTOM_SCREEN, bow.right.id, floor(rad2base512(bow.angle)), 256, 256);
+            // bows
+            SpriteRotScale(BOTTOM_SCREEN, bow.left.id, floor(rad2base512(bow.angle)), 256, 256);
+            NF_MoveSprite(BOTTOM_SCREEN, bow.left.id, 
+                bow.pos.x + bow.left.pos.x + bow.width/2 * (1 - cos(bow.angle)), 
+                bow.pos.y + bow.left.pos.y - bow.width/2 * sin(bow.angle));
+
+            SpriteRotScale(BOTTOM_SCREEN, bow.right.id, floor(rad2base512(bow.angle)), -256, 256);
             NF_MoveSprite(BOTTOM_SCREEN, bow.right.id, 
-                bow.pos.x + bow.right.pos.x + bow.left.pos.x/2 * (1 - cos(bow.angle)), 
-                bow.pos.y + bow.right.pos.y - bow.left.pos.x/2 * sin(bow.angle));
+                bow.pos.x + bow.right.pos.x - bow.width/2 * (1 - cos(bow.angle)), 
+                bow.pos.y + bow.right.pos.y + bow.width/2 * sin(bow.angle));
+
+            // string left
+            SpriteRotScale(BOTTOM_SCREEN, 3, 
+                floor(rad2base512(bow.angle - atan2(0.2 * bow.relative_distance.y, 63))), 256, 256);
+
+            NF_MoveSprite(BOTTOM_SCREEN, 3, 
+                bow.pos.x + bow.left.pos.x + bow.width/2 * (1 - cos(bow.angle)),
+                bow.pos.y + bow.left.pos.y - bow.width/2 * sin(bow.angle));
+            
+            // string right
+            SpriteRotScale(BOTTOM_SCREEN, 4,
+                floor(rad2base512(bow.angle + atan2(0.2 * bow.relative_distance.y, 63))), -256, 256);
+
+            NF_MoveSprite(BOTTOM_SCREEN, 4, 
+                bow.pos.x + bow.right.pos.x - bow.width/2 * (1 - cos(bow.angle)),
+                bow.pos.y + bow.right.pos.y + bow.width/2 * sin(bow.angle));
+
+            // arrow
+            arrow.sprite.pos.y = arrow.pos_def.y - 0.2 * bow.relative_distance.y;
+            NF_MoveSprite(BOTTOM_SCREEN, arrow.sprite.id,
+                arrow.pos.x + arrow.sprite.pos.x - (arrow.width/2 + arrow.sprite.pos.y) * sin(bow.angle), 
+                arrow.pos.y + arrow.sprite.pos.y - (arrow.width/2 + arrow.sprite.pos.y) * (1 - cos(bow.angle)));
+
         }
 
         else if (keysUp() & KEY_TOUCH) {
