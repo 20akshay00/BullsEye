@@ -110,6 +110,59 @@ void shoot()
     // Placeholder for shooting logic.
 }
 
+void rotateBow(struct Bow* bow){
+    SpriteRotScale(BOTTOM_SCREEN, bow->left.id, floor(rad2base512(bow->angle)), 256, 256);
+    NF_MoveSprite(BOTTOM_SCREEN, bow->left.id, 
+        bow->pos.x + bow->left.pos.x + bow->width/2 * (1 - cos(bow->angle)),
+        bow->pos.y + bow->left.pos.y - bow->width/2 * sin(bow->angle));
+
+    SpriteRotScale(BOTTOM_SCREEN, bow->right.id, floor(rad2base512(bow->angle)), -256, 256);
+    NF_MoveSprite(BOTTOM_SCREEN, bow->right.id, 
+        bow->pos.x + bow->right.pos.x - bow->width/2 * (1 - cos(bow->angle)), 
+        bow->pos.y + bow->right.pos.y + bow->width/2 * sin(bow->angle));
+
+    // string left
+    SpriteRotScale(BOTTOM_SCREEN, 3, 
+        floor(rad2base512(bow->angle - atan2(0.2 * bow->relative_distance.y, 63))), 256, 256);
+
+    NF_MoveSprite(BOTTOM_SCREEN, 3, 
+        bow->pos.x + bow->left.pos.x + bow->width/2 * (1 - cos(bow->angle)),
+        bow->pos.y + bow->left.pos.y - bow->width/2 * sin(bow->angle));
+    
+    // string right
+    SpriteRotScale(BOTTOM_SCREEN, 4,
+        floor(rad2base512(bow->angle + atan2(0.2 * bow->relative_distance.y, 63))), -256, 256);
+
+    NF_MoveSprite(BOTTOM_SCREEN, 4, 
+        bow->pos.x + bow->right.pos.x - bow->width/2 * (1 - cos(bow->angle)),
+        bow->pos.y + bow->right.pos.y + bow->width/2 * sin(bow->angle));
+}
+
+void rotateArrow(struct Arrow* arrow, struct Bow* bow)
+{
+    SpriteRotScale(BOTTOM_SCREEN, arrow->sprite.id, floor(rad2base512(bow->angle)), 256, 256);
+    
+    arrow->sprite.pos.y = arrow->pos_def.y - 0.2 * bow->relative_distance.y;
+    NF_MoveSprite(BOTTOM_SCREEN, arrow->sprite.id,
+        arrow->pos.x + arrow->sprite.pos.x - (arrow->width/2 + arrow->sprite.pos.y) * sin(bow->angle), 
+        arrow->pos.y + arrow->sprite.pos.y - (arrow->width/2 + arrow->sprite.pos.y) * (1 - cos(bow->angle)));
+}
+
+void switchSpriteScreen(struct Arrow* arrow){
+    NF_ShowSprite(arrow->sprite.screen, arrow->sprite.id, false);
+    arrow->sprite.screen = 1 - arrow->sprite.screen;
+    NF_ShowSprite(arrow->sprite.screen, arrow->sprite.id, true);
+}
+
+void resetArrow(struct Arrow* arrow, struct Bow* bow)
+{
+    switchSpriteScreen(arrow); 
+    arrow->pos.x = bow->pos.x;
+    arrow->pos.y = bow->pos.y;
+    arrow->active = false;
+    rotateArrow(arrow, bow);
+}
+
 int main(int argc, char **argv)
 {
     uint16_t keys_held;
@@ -279,7 +332,7 @@ int main(int argc, char **argv)
         .width = 64,
         .angle = 0.,
         .active = false,
-        .speed = 2
+        .speed = 10
     };
 
     // bottom screen sprite
@@ -317,6 +370,8 @@ int main(int argc, char **argv)
                 bow.active = true;
                 bow.anchor_point.x = touch_pos.px;
                 bow.anchor_point.y = touch_pos.py;
+                bow.relative_distance.x = 0;
+                bow.relative_distance.y = 0;
             }
             else {
                 bow.active = false;
@@ -340,7 +395,7 @@ int main(int argc, char **argv)
             
             if ((new_pos.x > crosshair.sprite.pos.x) && (new_pos.x < SCREEN_WIDTH - crosshair.sprite.pos.x))
             {
-                if ((new_pos.y > crosshair.sprite.pos.y) && (new_pos.y < SCREEN_HEIGHT - crosshair.sprite.pos.y))
+                if ((new_pos.y > crosshair.sprite.pos.y + 10) && (new_pos.y < SCREEN_HEIGHT - crosshair.sprite.pos.y))
                 {
                     crosshair.pos.x = new_pos.x;
                     crosshair.pos.y = new_pos.y;
@@ -353,7 +408,7 @@ int main(int argc, char **argv)
                     bow.relative_distance.x = (bow.anchor_point.x - touch_pos.px);
                 }
             } 
-            else if ((new_pos.y > crosshair.sprite.pos.y) && (new_pos.y < SCREEN_HEIGHT - crosshair.sprite.pos.y))
+            else if ((new_pos.y > crosshair.sprite.pos.y + 10) && (new_pos.y < SCREEN_HEIGHT - crosshair.sprite.pos.y))
             {
                 crosshair.pos.y = new_pos.y;
                 bow.relative_distance.y = (bow.anchor_point.y - touch_pos.py);            
@@ -363,42 +418,11 @@ int main(int argc, char **argv)
 
             // rotate bow
             bow.angle = atan2(bow.relative_distance.y, bow.relative_distance.x) + PI / 2;
-
-            // bows
-            SpriteRotScale(BOTTOM_SCREEN, bow.left.id, floor(rad2base512(bow.angle)), 256, 256);
-            NF_MoveSprite(BOTTOM_SCREEN, bow.left.id, 
-                bow.pos.x + bow.left.pos.x + bow.width/2 * (1 - cos(bow.angle)),
-                bow.pos.y + bow.left.pos.y - bow.width/2 * sin(bow.angle));
-
-            SpriteRotScale(BOTTOM_SCREEN, bow.right.id, floor(rad2base512(bow.angle)), -256, 256);
-            NF_MoveSprite(BOTTOM_SCREEN, bow.right.id, 
-                bow.pos.x + bow.right.pos.x - bow.width/2 * (1 - cos(bow.angle)), 
-                bow.pos.y + bow.right.pos.y + bow.width/2 * sin(bow.angle));
-
-            // string left
-            SpriteRotScale(BOTTOM_SCREEN, 3, 
-                floor(rad2base512(bow.angle - atan2(0.2 * bow.relative_distance.y, 63))), 256, 256);
-
-            NF_MoveSprite(BOTTOM_SCREEN, 3, 
-                bow.pos.x + bow.left.pos.x + bow.width/2 * (1 - cos(bow.angle)),
-                bow.pos.y + bow.left.pos.y - bow.width/2 * sin(bow.angle));
-            
-            // string right
-            SpriteRotScale(BOTTOM_SCREEN, 4,
-                floor(rad2base512(bow.angle + atan2(0.2 * bow.relative_distance.y, 63))), -256, 256);
-
-            NF_MoveSprite(BOTTOM_SCREEN, 4, 
-                bow.pos.x + bow.right.pos.x - bow.width/2 * (1 - cos(bow.angle)),
-                bow.pos.y + bow.right.pos.y + bow.width/2 * sin(bow.angle));
+            rotateBow(&bow);
 
             // arrow
-            if (!arrow.active){
-                SpriteRotScale(BOTTOM_SCREEN, arrow.sprite.id, floor(rad2base512(bow.angle)), 256, 256);
-                arrow.sprite.pos.y = arrow.pos_def.y - 0.2 * bow.relative_distance.y;
-                NF_MoveSprite(BOTTOM_SCREEN, arrow.sprite.id,
-                    arrow.pos.x + arrow.sprite.pos.x - (arrow.width/2 + arrow.sprite.pos.y) * sin(bow.angle), 
-                    arrow.pos.y + arrow.sprite.pos.y - (arrow.width/2 + arrow.sprite.pos.y) * (1 - cos(bow.angle)));
-            }
+            if (!arrow.active)
+                rotateArrow(&arrow, &bow);
         }
 
         else if ((keysUp() & KEY_TOUCH) && (!arrow.active)){
@@ -411,39 +435,28 @@ int main(int argc, char **argv)
 
         if (arrow.active){
             if ((arrow.pos.y - (arrow.width + arrow.sprite.pos.y) * sin(arrow.angle) < 0) && (arrow.sprite.screen == BOTTOM_SCREEN)){
-                NF_ShowSprite(arrow.sprite.screen, arrow.sprite.id, false);
-                
-                arrow.sprite.screen = TOP_SCREEN;
-                arrow.pos.x = crosshair.pos.x + floor(crosshair.pos.y * tan(arrow.angle));
+                switchSpriteScreen(&arrow);
+                arrow.pos.x = crosshair.pos.x - floor(crosshair.pos.y * tan(arrow.angle));
                 arrow.pos.y = SCREEN_HEIGHT;
                 SpriteRotScale(arrow.sprite.screen, arrow.sprite.id, floor(rad2base512(arrow.angle)), 256, 256);
-                NF_ShowSprite(arrow.sprite.screen, arrow.sprite.id, true);
             }
     
-            if (arrow.sprite.screen == TOP_SCREEN){
-                if (pow(arrow.pos.x - crosshair.pos.x, 2) + pow(arrow.pos.y - crosshair.pos.y, 2) < 100){
-                    NF_ShowSprite(arrow.sprite.screen, arrow.sprite.id, false);
-                    arrow.sprite.screen = BOTTOM_SCREEN;
-                    NF_ShowSprite(arrow.sprite.screen, arrow.sprite.id, true);
-                    arrow.pos.x = bow.pos.x;
-                    arrow.pos.y = bow.pos.y;
-
-                    arrow.active = false;
-                }
-            }
-
             arrow.pos.x += sin(arrow.angle) * arrow.speed;
             arrow.pos.y -= cos(arrow.angle) * arrow.speed;
-            NF_MoveSprite(arrow.sprite.screen, arrow.sprite.id,
-                    arrow.pos.x + arrow.sprite.pos.x,
-                    arrow.pos.y + arrow.sprite.pos.y);
+            NF_MoveSprite(arrow.sprite.screen, arrow.sprite.id, arrow.pos.x + arrow.sprite.pos.x, arrow.pos.y + arrow.sprite.pos.y);
+
+            if (arrow.sprite.screen == TOP_SCREEN){
+                if ((pow(arrow.pos.x - crosshair.pos.x, 2) + pow(arrow.pos.y - crosshair.pos.y, 2) < 400) || (keysDown() & KEY_A)){
+                    resetArrow(&arrow, &bow);
+                }
+            }
         }
 
         if (DEBUG) {
             char buffer[32];
 
             NF_ClearTextLayer16(BOTTOM_SCREEN, 0);
-            snprintf(buffer, sizeof(buffer), "Angle: %f, %d, %d", bow.angle * 180/PI, crosshair.pos.x, crosshair.pos.y); 
+            snprintf(buffer, sizeof(buffer), "Angle: %f, %d, %d", bow.angle * 180/PI, bow.relative_distance.x, bow.relative_distance.y); 
             NF_WriteText16(BOTTOM_SCREEN, 0, 1, 1, buffer);            
             NF_UpdateTextLayers();
         }
