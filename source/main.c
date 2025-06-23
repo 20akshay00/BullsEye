@@ -13,6 +13,7 @@
 #define MAX_TOUCH_DISTANCE 64
 
 #define PI 3.14159265358979323846
+#define DEBUG false
 
 struct Vector2 {
     int x;
@@ -28,7 +29,6 @@ struct Sprite2D {
 struct CrossHair{
     struct Sprite2D sprite;
     struct Vector2 pos;
-    bool active;
 };
 
 struct Bow {
@@ -46,7 +46,7 @@ struct Arrow {
     struct Vector2 pos; // position of the arrow
     struct Sprite2D sprite;
     int width; // width of the arrow
-    int angle; // angle of the arrow in base 512
+    float angle; // angle of the arrow in radians
     bool active; // whether the arrow is active or not
     int speed; // speed of the arrow
 };
@@ -54,13 +54,11 @@ struct Arrow {
 void draw(struct CrossHair *crosshair)
 {
     // Draw the crosshair sprite at the new position.
-    if (crosshair->active){
-        NF_MoveSprite(
-        crosshair->sprite.screen, 
-        crosshair->sprite.id, 
-        crosshair->pos.x + crosshair->sprite.pos.x, 
-        crosshair->pos.y + crosshair->sprite.pos.y);
-    }
+    NF_MoveSprite(
+    crosshair->sprite.screen, 
+    crosshair->sprite.id, 
+    crosshair->pos.x + crosshair->sprite.pos.x, 
+    crosshair->pos.y + crosshair->sprite.pos.y);
 }
 
 float rad2base512(float radians)
@@ -106,27 +104,9 @@ bool readInput(uint16_t *keys_held, touchPosition *touch_pos)
     return false;
 }
 
-void debug(uint16_t keys_held, touchPosition touch_pos)
-{
-    // Print touch position information to console.
-    consoleClear();
-
-    if (keys_held & KEY_TOUCH)
-        consoleSetColor(NULL, CONSOLE_LIGHT_GREEN);
-    else
-        consoleSetColor(NULL, CONSOLE_LIGHT_RED);
-
-    printf("Raw coords: [%d, %d]\n", touch_pos.rawx, touch_pos.rawy);
-    printf("Adjusted coords: [%d, %d]\n", touch_pos.px, touch_pos.py);
-    consoleSetColor(NULL, CONSOLE_DEFAULT);
-}
-
 void shoot()
 {
     // Placeholder for shooting logic.
-    consoleSetColor(NULL, CONSOLE_LIGHT_BLUE);
-    printf("Shoot!\n");
-    consoleSetColor(NULL, CONSOLE_DEFAULT);
 }
 
 int main(int argc, char **argv)
@@ -134,10 +114,13 @@ int main(int argc, char **argv)
     uint16_t keys_held;
     touchPosition touch_pos;
 
-    // Turn on MODE 0 on the Top Screen
     NF_Set2D(TOP_SCREEN, 0);
     NF_Set2D(BOTTOM_SCREEN, 0);
+    
     consoleDemoInit();
+    printf("\n NitroFS init. Please wait.\n\n");
+    printf(" Iniciando NitroFS,\n por favor, espere.\n\n");
+    swiWaitForVBlank();
 
     // Set the Root Folder
     nitroFSInit(NULL);
@@ -145,12 +128,14 @@ int main(int argc, char **argv)
     
     // Initialize 2D engine in both screens and use mode 0
     NF_Set2D(TOP_SCREEN, 0);
-    NF_Set2D(BOTTOM_SCREEN, 0);
+    NF_Set2D(BOTTOM_SCREEN, 1);
 
     // Initialize the Tiled Backgrounds System on the Top Screen
     NF_InitTiledBgBuffers();
     NF_InitTiledBgSys(TOP_SCREEN);
     NF_InitTiledBgSys(BOTTOM_SCREEN);
+
+    NF_InitTextSys(BOTTOM_SCREEN);
 
     // Initialize sprite system
     NF_InitSpriteBuffers();     // Initialize storage buffers
@@ -162,6 +147,14 @@ int main(int argc, char **argv)
     NF_CreateTiledBg(TOP_SCREEN, 0, "bg");
     NF_CreateTiledBg(BOTTOM_SCREEN, 0, "bg");
 
+    // Load font
+    if (DEBUG){
+        NF_LoadTextFont16("fonts/font16", "down", 256, 256, 0);
+        NF_CreateTextLayer16(1, 0, 0, "down");
+        NF_WriteText16(BOTTOM_SCREEN, 0, 1, 1, "DEBUG LINE"); // Text with default color
+        NF_UpdateTextLayers();
+    }
+    
     // Load sprite files from NitroFS
     NF_LoadSpriteGfx("sprites/crosshair", 0, 32, 32);
     NF_LoadSpritePal("sprites/crosshair", 0);
@@ -195,8 +188,7 @@ int main(int argc, char **argv)
             .screen = TOP_SCREEN,
             .id = 0,
             .pos = {-16, -16}
-        },
-        .active = false
+        }
     };
 
     NF_CreateSprite(
@@ -280,9 +272,9 @@ int main(int argc, char **argv)
             .pos = {-32, -32} // relative to bow position
         },
         .width = 64,
-        .angle = 0,
+        .angle = 0.,
         .active = false,
-        .speed = 2
+        .speed = 20
     };
 
     NF_CreateSprite(
@@ -295,11 +287,13 @@ int main(int argc, char **argv)
 
     NF_EnableSpriteRotScale(arrow.sprite.screen, arrow.sprite.id, 5, false);
 
+    consoleSetColor(NULL, CONSOLE_LIGHT_GREEN);
+    printf("Fuck this shit.");
+    
     while (1)
     {
         swiWaitForVBlank();
         if (readInput(&keys_held, &touch_pos)) { break; }
-        debug(keys_held, touch_pos);
         
         if (keysDown() & KEY_TOUCH){
             bow.anchor_point.x = touch_pos.px;
@@ -359,7 +353,7 @@ int main(int argc, char **argv)
 
         else if ((keysUp() & KEY_TOUCH) && (!arrow.active)){
             arrow.active = true;
-            arrow.angle = floor(rad2base512(bow.angle));
+            arrow.angle = bow.angle - PI/2;
             arrow.pos.x -= (arrow.width/2 + arrow.sprite.pos.y) * sin(bow.angle);
             arrow.pos.y -= (arrow.width/2 + arrow.sprite.pos.y) * (1 - cos(bow.angle));
             shoot();
@@ -371,6 +365,15 @@ int main(int argc, char **argv)
             NF_MoveSprite(BOTTOM_SCREEN, arrow.sprite.id,
                     arrow.pos.x + arrow.sprite.pos.x, 
                     arrow.pos.y + arrow.sprite.pos.y);
+        }
+
+        if (DEBUG) {
+            char buffer[32];
+
+            NF_ClearTextLayer16(BOTTOM_SCREEN, 0);
+            snprintf(buffer, sizeof(buffer), "Angle: %f", arrow.angle);
+            NF_WriteText16(BOTTOM_SCREEN, 0, 1, 1, buffer);            
+            NF_UpdateTextLayers();
         }
 
         // Update OAM array
