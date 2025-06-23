@@ -385,9 +385,12 @@ int main(int argc, char **argv)
         }
         
         if ((keys_held & KEY_TOUCH) && bow.active){
-            new_pos.x = SCREEN_WIDTH/2 + TOUCH_SENSITIVITY * (bow.anchor_point.x - touch_pos.px);
-            new_pos.y = SCREEN_HEIGHT + TOUCH_SENSITIVITY * (bow.anchor_point.y - touch_pos.py);
+            // new_pos.x = SCREEN_WIDTH/2 + TOUCH_SENSITIVITY * (bow.anchor_point.x - touch_pos.px);
+            // new_pos.y = SCREEN_HEIGHT + TOUCH_SENSITIVITY * (bow.anchor_point.y - touch_pos.py);
             
+            new_pos.x = tan(bow.angle) * (bow.pos.y + SCREEN_HEIGHT/2.5) + SCREEN_WIDTH/2 + TOUCH_SENSITIVITY * (bow.anchor_point.x - touch_pos.px);
+            new_pos.y = SCREEN_HEIGHT + TOUCH_SENSITIVITY * (bow.anchor_point.y - touch_pos.py);
+
             if ((new_pos.x > crosshair.sprite.pos.x) && (new_pos.x < SCREEN_WIDTH - crosshair.sprite.pos.x))
             {
                 if ((new_pos.y > crosshair.sprite.pos.y + 10) && (new_pos.y < SCREEN_HEIGHT - crosshair.sprite.pos.y))

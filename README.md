@@ -8,5 +8,5 @@ A simple game made with [libnds](https://github.com/blocksds/libnds) from the [B
 - Run `make` to generate the executable.
 
 ## Running the NDS file
-- Any common emulator such as [MelonDS](https://melonds.kuribo64.net/) or [DeSmuME](http://desmume.org/) can run the file as is.
+- Any common emulator such as [MelonDS](https://melonds.kuribo64.net/) or [DeSmuME](http://desmume.org/) can run the file as is. The visuals are intended to be viewed on a DSi XL, so the screen gap should be set to 64px for the best experience.
 - For running on actual hardware, the system must be [modded](https://dsi.cfw.guide/). In that case, simply place the file on the SD card and the application should show up on the menu.
