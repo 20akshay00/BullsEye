@@ -10,7 +10,7 @@
 #define SCREEN_WIDTH 256
 #define SCREEN_HEIGHT 192
 #define TOUCH_SENSITIVITY 2.75
-#define MAX_TOUCH_DISTANCE 64
+#define MAX_TOUCH_DISTANCE 32
 
 #define PI 3.14159265358979323846
 #define DEBUG true
@@ -39,6 +39,7 @@ struct Bow {
     struct Sprite2D left;
     struct Sprite2D right;
     int width; // width of the bow
+    bool active; // whether the bow is active or not
 };
 
 struct Arrow {
@@ -218,7 +219,8 @@ int main(int argc, char **argv)
             .id = 2,
             .pos = {0, -32}
         },
-        .width = 64
+        .width = 64,
+        .active = false
     };
 
     // left half
@@ -310,11 +312,18 @@ int main(int argc, char **argv)
         if (readInput(&keys_held, &touch_pos)) { break; }
         
         if (keysDown() & KEY_TOUCH){
-            bow.anchor_point.x = touch_pos.px;
-            bow.anchor_point.y = touch_pos.py;
+            if ((abs(touch_pos.px - bow.pos.x) < MAX_TOUCH_DISTANCE) && (abs(touch_pos.py - bow.pos.y) < MAX_TOUCH_DISTANCE))
+            {
+                bow.active = true;
+                bow.anchor_point.x = touch_pos.px;
+                bow.anchor_point.y = touch_pos.py;
+            }
+            else {
+                bow.active = false;
+            }
         }
         
-        if (keys_held & KEY_TOUCH) {
+        if ((keys_held & KEY_TOUCH) && bow.active){
             // bow.relative_distance.x = bow.anchor_point.x - touch_pos.px;
             // if (abs(bow.relative_distance.x) > MAX_TOUCH_DISTANCE)
             //     bow.relative_distance.x = sign(bow.relative_distance.x) * MAX_TOUCH_DISTANCE;
