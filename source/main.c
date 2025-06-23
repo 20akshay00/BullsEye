@@ -181,6 +181,9 @@ int main(int argc, char **argv)
     NF_VramSpriteGfx(BOTTOM_SCREEN, 3, 2, true);
     NF_VramSpritePal(BOTTOM_SCREEN, 3, 2);
 
+    NF_VramSpriteGfx(TOP_SCREEN, 3, 2, true);
+    NF_VramSpritePal(TOP_SCREEN, 3, 2);
+
     // create cross hair
     struct CrossHair crosshair = {
         .pos = {0, 0},
@@ -274,9 +277,10 @@ int main(int argc, char **argv)
         .width = 64,
         .angle = 0.,
         .active = false,
-        .speed = 20
+        .speed = 2
     };
 
+    // bottom screen sprite
     NF_CreateSprite(
         arrow.sprite.screen,
         arrow.sprite.id,
@@ -287,9 +291,17 @@ int main(int argc, char **argv)
 
     NF_EnableSpriteRotScale(arrow.sprite.screen, arrow.sprite.id, 5, false);
 
-    consoleSetColor(NULL, CONSOLE_LIGHT_GREEN);
-    printf("Fuck this shit.");
-    
+    // top screen sprite
+    NF_CreateSprite(
+        TOP_SCREEN,
+        arrow.sprite.id,
+        2, 0,
+        arrow.pos.x + arrow.sprite.pos.x,
+        arrow.pos.y + arrow.sprite.pos.y
+    );
+    NF_EnableSpriteRotScale(TOP_SCREEN, arrow.sprite.id, 5, false);
+    NF_ShowSprite(TOP_SCREEN, arrow.sprite.id, false);
+
     while (1)
     {
         swiWaitForVBlank();
@@ -360,9 +372,19 @@ int main(int argc, char **argv)
         }
 
         if (arrow.active){
+            if ((arrow.pos.y - (arrow.width + arrow.sprite.pos.y) * cos(arrow.angle) < 0) && (arrow.sprite.screen == BOTTOM_SCREEN)){
+                NF_ShowSprite(arrow.sprite.screen, arrow.sprite.id, false);
+                
+                arrow.sprite.screen = TOP_SCREEN;
+                arrow.pos.x = crosshair.pos.x - crosshair.pos.y/ tan(PI - arrow.angle);
+                arrow.pos.y = SCREEN_HEIGHT;
+                SpriteRotScale(arrow.sprite.screen, arrow.sprite.id, floor(rad2base512(arrow.angle + PI/2)), 256, 256);
+                NF_ShowSprite(arrow.sprite.screen, arrow.sprite.id, true);
+            }
+    
             arrow.pos.x += cos(arrow.angle) * arrow.speed;
             arrow.pos.y += sin(arrow.angle) * arrow.speed;
-            NF_MoveSprite(BOTTOM_SCREEN, arrow.sprite.id,
+            NF_MoveSprite(arrow.sprite.screen, arrow.sprite.id,
                     arrow.pos.x + arrow.sprite.pos.x, 
                     arrow.pos.y + arrow.sprite.pos.y);
         }
